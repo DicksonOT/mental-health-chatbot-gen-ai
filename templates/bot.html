@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mental Health Support Bot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="chat-container">
+    <div class="header">
+      <h1>Mental Health Support</h1>
+      <p class="subtitle">Your compassionate AI companion</p>
+    </div>
+    
+    <div id="chat-box">
+      <div class="welcome-message">
+        <p>👋 Hello! I'm here to provide support and listen to you. How are you feeling today?</p>
+      </div>
+    </div>
+
+    <div class="typing-indicator" id="typing-indicator">
+      <div class="typing-dots">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+
+    <form id="chat-form" class="input-container">
+      <input type="text" id="user-input" name="msg" placeholder="Share what's on your mind..." required />
+      <button type="submit" class="send-button">Send</button>
+    </form>
+  </div>
+
+  <script>
+    const chatForm = document.getElementById('chat-form');
+    const chatBox = document.getElementById('chat-box');
+    const userInput = document.getElementById('user-input');
+    const typingIndicator = document.getElementById('typing-indicator');
+
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = userInput.value.trim();
+      if (!message) return;
+
+      appendMessage("user", message);
+      userInput.value = "";
+      
+      // Show typing indicator
+      showTypingIndicator();
+
+      try {
+        const response = await fetch("/get", {
+          method: "POST",
+          headers: {"Content-Type": "application/x-www-form-urlencoded"},
+          body: `msg=${encodeURIComponent(message)}`
+        });
+
+        const text = await response.text();
+        
+        // Hide typing indicator and show response
+        setTimeout(() => {
+          hideTypingIndicator();
+          appendMessage("bot", text);
+        }, 1000 + Math.random() * 2000); 
+        
+      } catch (error) {
+        hideTypingIndicator();
+        appendMessage("bot", "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.");
+      }
+    });
+
+    function appendMessage(sender, message) {
+      const msgDiv = document.createElement("div");
+      msgDiv.classList.add("message", sender);
+      msgDiv.innerHTML = message;
+      chatBox.appendChild(msgDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function showTypingIndicator() {
+      typingIndicator.style.display = 'flex';
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function hideTypingIndicator() {
+      typingIndicator.style.display = 'none';
+    }
+
+    // Auto-focus input
+    userInput.focus();
+
+  
+    const sampleMessages = [
+      "I'm here to listen and support you through whatever you're going through.",
+      "Remember, it's okay to not be okay. Taking care of your mental health is important.",
+      "What would you like to talk about today?"
+    ];
+  </script>
+</body>
+</html>
