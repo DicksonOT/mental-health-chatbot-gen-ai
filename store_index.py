@@ -1,33 +1,24 @@
-from src.helper import  load_pdf_file, text_split
-from dotenv import load_dotenv
-from langchain_huggingface import HuggingFaceEmbeddings
-from pinecone import Pinecone, ServerlessSpec
-from langchain_pinecone import PineconeVectorStore
+# 
+# store_index.py
+# This file is responsible for loading and splitting PDF documents,
+# making the 'text_chunks' available for import.
+# It should NOT initialize embeddings or interact with Pinecone directly,
+# as that will be handled in app.py to prevent double-loading.
+
 import os
+from src.helper import load_pdf_file, text_split # Assuming src/helper.py is correctly set up
 
-load_dotenv()
+# Define the path to your data directory
+# IMPORTANT: Ensure your PDF mental health book is located in this directory.
+PDF_DATA_DIRECTORY = 'C:/Users/Osei Tutu Dickson/Desktop/Gen AI/mental-health-chatbot-gen-ai/Data/'
 
-PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY')
-
-
-extracted_data = load_pdf_file(data='C:/Users/Osei Tutu Dickson/Desktop/Gen AI/mental-health-chatbot-gen-ai/Data/')
+# Load and split documents to get text_chunks
+# This code will execute only once when store_index.py is first imported
+print("Loading and splitting PDF documents for indexing...")
+extracted_data = load_pdf_file(data=PDF_DATA_DIRECTORY)
 text_chunks = text_split(extracted_data)
-embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')
 
+if not text_chunks:
+    print("WARNING: No text chunks were created in store_index.py. "
+          "The RAG system might not have content for retrieval.")
 
-pc = Pinecone(api_key=PINECONE_API_KEY)
-index_name = "mentalbot"
-
-if index_name not in pc.list_indexes().names():
-    pc.create_index(
-        name=index_name,
-        dimension=384,
-        metric="cosine",
-        spec=ServerlessSpec(cloud="aws", region="us-east-1")
-    )
-
-docsearch = PineconeVectorStore.from_documents(
-    documents=text_chunks,
-    index_name=index_name,
-    embedding=embeddings
-)
