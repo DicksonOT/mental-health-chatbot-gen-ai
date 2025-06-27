@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, request
 import os
 import traceback
 from dotenv import load_dotenv
@@ -16,8 +16,6 @@ from flask_cors import CORS
 load_dotenv()
 
 app = Flask(__name__)
-
-# Enable CORS for development. For production, restrict origins.
 CORS(app)
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -26,19 +24,18 @@ PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 
 embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')
 
-# --- Pinecone Index Setup and Document Upserting ---
+# Pinecone Index Setup and Document Upserting 
 index_name = "mentalbot"
 
 try:
     pc = Pinecone(api_key=PINECONE_API_KEY)
 
-    # Check if index exists and create if not
     if index_name not in pc.list_indexes().names():
         pc.create_index(
             name=index_name,
-            dimension=384, # Must match the dimension of 'all-MiniLM-L6-v2' embeddings
+            dimension=384,
             metric="cosine",
-            spec=ServerlessSpec(cloud="aws", region="us-east-1") # Adjust region if desired
+            spec=ServerlessSpec(cloud="aws", region="us-east-1")
         )
 
         if text_chunks:
@@ -55,43 +52,35 @@ try:
         index_name=index_name,
         embedding=embeddings 
     ).as_retriever(search_kwargs={"k": 3}) 
-    print("Pinecone retriever initialized.")
 
 except Exception as e:
     print(f"ERROR: Failed to set up Pinecone or retriever: {e}")
-    traceback.print_exc()
-    exit("Pinecone setup failed. Cannot proceed.")
 
-# --- Generative AI (LLM) Configuration ---
+# Generative AI (LLM) Configuration 
 try:
     llm = ChatGoogleGenerativeAI(
         model="gemini-1.5-flash-latest",
         google_api_key=GEMINI_API_KEY,
         temperature=0.3, 
     )
-    print("Gemini LLM initialized.")
 except Exception as e:
     print(f"ERROR: Failed to initialize Gemini LLM: {e}")
-    traceback.print_exc()
-    exit("Gemini LLM initialization failed. Cannot proceed.")
 
 prompt_template = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
     ("human", "{input}")
 ])
 
+
 # Create the chains
 try:
     question_answer_chain = create_stuff_documents_chain(llm, prompt_template)
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-    print("RAG chain successfully created.")
 except Exception as e:
     print(f"ERROR: Failed to create RAG chains: {e}")
-    traceback.print_exc()
-    exit("RAG chain creation failed. Cannot proceed.")
 
 
-# --- Flask Routes ---
+# Flask Routes 
 @app.route("/")
 def index():
     """Serves the main chatbot HTML page."""
@@ -102,26 +91,20 @@ def chat():
     """Handles chatbot queries and returns responses."""
     try:
         msg = request.form["msg"]
-        print(f"Received query: '{msg}'")
-
-        # Invoke the RAG chain to get a response
         response = rag_chain.invoke({"input": msg})
         
-        chatbot_answer = response["answer"]
-        print(f"Sending response: '{chatbot_answer}'")
-        return str(chatbot_answer) # Ensure the response is a string
+        answer = response["answer"]
+        return str(answer)
 
     except Exception as e:
-        # Capture and print the full error on the server side for debugging
         print(f"ERROR during RAG chain invocation: {str(e)}")
-        traceback.print_exc()
 
         # Provide a more specific error message to the frontend if it's a quota error
         if "quota" in str(e).lower() or "resourceexhausted" in str(e).lower():
-            return "Apologies, the chatbot is currently experiencing high demand. Please try again in a few moments.", 429
+            return "Apologies, the chatbot is currently experiencing high demand. Please try again later."
         else:
-            return "An internal error occurred. Please try again later.", 500
+            return "An internal error occurred. Please try again later."
 
-# --- Run the Flask Application ---
+# Run the Flask Application 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=False)
