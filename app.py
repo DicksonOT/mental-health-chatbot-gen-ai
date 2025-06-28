@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request
 import os
-import traceback
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_pinecone import PineconeVectorStore
@@ -24,7 +23,7 @@ PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 
 embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-MiniLM-L6-v2')
 
-# Pinecone Index Setup and Document Upserting 
+# Pinecone Index Setup 
 index_name = "mentalbot"
 
 try:
@@ -72,7 +71,7 @@ prompt_template = ChatPromptTemplate.from_messages([
 ])
 
 
-# Create the chains
+# Creating chains
 try:
     question_answer_chain = create_stuff_documents_chain(llm, prompt_template)
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
@@ -99,12 +98,11 @@ def chat():
     except Exception as e:
         print(f"ERROR during RAG chain invocation: {str(e)}")
 
-        # Provide a more specific error message to the frontend if it's a quota error
         if "quota" in str(e).lower() or "resourceexhausted" in str(e).lower():
             return "Apologies, the chatbot is currently experiencing high demand. Please try again later."
         else:
             return "An internal error occurred. Please try again later."
 
-# Run the Flask Application 
+# Running Flask Application 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8080, debug=False)
